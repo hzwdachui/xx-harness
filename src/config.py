@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-HARNESS_HOME = Path(os.environ.get("XX_HARNESS_HOME", Path.home() / ".xx-harness"))
+HARNESS_HOME = Path(os.environ.get("XX_HARNESS_HOME", Path.cwd() / ".harness"))
 DB_PATH = HARNESS_HOME / "harness.db"
 WORKSPACE_ROOT = HARNESS_HOME / "workspace"
 WEB_PORT = int(os.environ.get("XX_HARNESS_PORT", "8720"))
