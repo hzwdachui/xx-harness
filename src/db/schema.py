@@ -112,7 +112,7 @@ def create_schema(db: DatabaseAdapter) -> None:
             agent_role TEXT NOT NULL,
             skill TEXT NOT NULL,
             project_id INTEGER REFERENCES project(id),
-            UNIQUE(agent_role, project_id)
+            UNIQUE(agent_role, skill, project_id)
         )
     """)
 
@@ -143,7 +143,7 @@ def seed_data(db: DatabaseAdapter) -> None:
     ]
     for role, skill in skills:
         existing = db.fetch_one(
-            "SELECT id FROM skill_mapping WHERE agent_role=? AND skill=?", [role, skill]
+            "SELECT id FROM skill_mapping WHERE agent_role=? AND skill=? AND project_id IS NULL", [role, skill]
         )
         if not existing:
             db.execute(
