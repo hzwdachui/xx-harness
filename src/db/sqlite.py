@@ -9,7 +9,7 @@ from src.db.adapter import DatabaseAdapter
 
 class SQLiteAdapter(DatabaseAdapter):
     def __init__(self, db_path: str):
-        self._conn = sqlite3.connect(db_path, isolation_level=None)
+        self._conn = sqlite3.connect(db_path, isolation_level=None, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
