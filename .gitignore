@@ -219,3 +219,6 @@ __marimo__/
 
 # xx-harness
 workspace/
+
+# frontend
+node_modules/
