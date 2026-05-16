@@ -223,3 +223,4 @@ workspace/
 # frontend
 node_modules/
 venv/
+xx_harness.egg-info/
