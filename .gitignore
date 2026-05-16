@@ -222,3 +222,4 @@ workspace/
 
 # frontend
 node_modules/
+venv/
