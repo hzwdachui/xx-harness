@@ -1,19 +1,20 @@
 import pytest
-import sqlite3
 import tempfile
 from pathlib import Path
+
+from src.db.sqlite import SQLiteAdapter
+from src.db.schema import create_schema, seed_data
 
 
 @pytest.fixture
 def tmp_db():
-    """Temporary SQLite database fixture.
-    Will be upgraded to use DatabaseAdapter once db layer is built (Task 2-3)."""
+    """Temporary SQLite database fixture backed by SQLiteAdapter."""
     with tempfile.TemporaryDirectory() as d:
         db_path = Path(d) / "test.db"
-        conn = sqlite3.connect(str(db_path))
-        conn.row_factory = sqlite3.Row
-        yield conn
-        conn.close()
+        db = SQLiteAdapter(str(db_path))
+        create_schema(db)
+        seed_data(db)
+        yield db
 
 
 @pytest.fixture
