@@ -1,0 +1,13 @@
+services:
+  harness:
+    build: .
+    ports:
+      - "8720:8720"
+    volumes:
+      - harness_data:/root/.xx-harness
+      - ./src:/app/src
+    environment:
+      - XX_HARNESS_HOME=/root/.xx-harness
+
+volumes:
+  harness_data:
