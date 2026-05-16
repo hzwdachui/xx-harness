@@ -65,13 +65,17 @@ CC进程1         CC进程2         CC进程N
 | Web 前端 | TypeScript + React |
 | 数据库 | SQLite（后续可迁移到 MySQL/PostgreSQL） |
 | Agent 引擎 | Claude Code |
+| 工作空间 | git worktree（在 xx-harness/workspace/ 下隔离） |
+| Skills | Superpowers plugin 等 Claude Code skills |
 
 ## 4. 核心数据模型
 
 ```
-Project ──1:N──> Workflow
-  │                │
-  │                └──1:N──> WorkflowNode ──1:1──> AgentTemplate
+Project ──1:N──> Repository
+  │
+  ├──1:N──> Workflow
+  │            │
+  │            └──1:N──> WorkflowNode ──1:1──> AgentTemplate
   │
   ├──1:N──> ConstraintRule (项目级约束)
   ├──1:N──> Task
@@ -95,9 +99,10 @@ Project ──1:N──> Workflow
 
 | 实体 | 关键字段 | 说明 |
 |------|---------|------|
-| Project | name, repo_path, description, boundary | 项目是顶层容器，定义边界 |
+| Project | name, description, boundary | 项目是顶层容器，定义边界 |
+| Repository | project_id, name, git_url, default_branch | 项目可关联多个仓库（可有重叠目录） |
 | Workflow | project_id, name, dag(json) | 项目可配多个工作流 |
-| WorkflowNode | workflow_id, agent_id, depends_on, review_gate(bool), context(json) | DAG 节点 |
+| WorkflowNode | workflow_id, agent_id, depends_on, review_gate(bool), skill, skill_args, context(json) | DAG 节点 + skill 绑定 |
 | AgentTemplate | name, role, system_prompt, tools(json) | 可复用的 Agent 角色定义 |
 | ConstraintRule | project_id, rule_type, content, level(global/project) | 约束规则，支持全局和项目级 |
 
@@ -116,17 +121,114 @@ Project ──1:N──> Workflow
 | KnownIssue | project_id, error_pattern, root_cause, rule_update, level | 失败案例库 |
 | AgentSession | task_id, node_run_id, session_log, summary | Claude Code 会话记录 |
 
-## 5. DAG 编排模型
+## 5. 工作空间管理
 
-### 5.1 节点类型
+### 5.1 目录结构
+
+所有代码在 xx-harness 大目录下隔离管理，不跳出：
+
+```
+xx-harness/
+├── workspace/                  (gitignored)
+│   └── <project-name>/
+│       ├── repos/              (bare clones，共享 objects)
+│       │   ├── repo-a.git/
+│       │   └── repo-b.git/
+│       └── worktrees/
+│           ├── task-1/         (repo-a worktree)
+│           ├── task-2/         (repo-a 另一个 worktree)
+│           └── task-3/         (repo-b worktree)
+├── harness.db
+└── ...
+```
+
+### 5.2 Git Worktree 策略
+
+- 项目中的 repo 先在 `repos/` 下做 bare clone（共享 git objects，节省空间）
+- 每个 task 启动时从 bare clone 创建 worktree `worktrees/<task-id>/`
+- 同一 repo 的不同 task 有独立 worktree，互不干扰
+- 项目涉及多个 repo 时，一个 task 可拥有多个 worktree
+- 多个 repo 有重叠目录时，各自 worktree 独立，无冲突
+- Task 完成后可选择保留或清理 worktree
+
+### 5.3 编排引擎中的工作空间初始化
+
+```
+function prepare_workspace(task_id):
+    task = load_task(task_id)
+    project = load_project(task.project_id)
+    
+    for each repo in project.repos:
+        ensure_bare_clone(workspace_path + "/repos/" + repo.name)
+        create_worktree(
+            bare_repo=workspace_path + "/repos/" + repo.name,
+            worktree_path=workspace_path + "/worktrees/" + task_id + "/" + repo.name,
+            branch="harness/" + task_id   # 或基于 task 指定 base
+        )
+    
+    return workspace_path + "/worktrees/" + task_id
+```
+
+## 6. Skills 集成
+
+### 6.1 节点与 Skill 绑定
+
+每个 WorkflowNode 可指定启动时注入的 skill：
+
+| 字段 | 说明 |
+|------|------|
+| `skill` | 该阶段使用的 skill 名称（如 `superpowers:brainstorming`） |
+| `skill_args` | 传递给 skill 的额外参数 |
+
+### 6.2 Skill 系统
+
+Skill 不限定来源——可以是 superpowers plugin、用户自定义 skill、或未来安装的其他 plugin。系统级可配置默认映射，项目级可覆盖。
+
+**推荐的系统默认映射（基于 superpowers 示例）：**
+
+| Agent 角色 / 阶段 | 推荐 Skill | 用途 |
+|-------------------|-----------|------|
+| 规划师 (planner) | `superpowers:brainstorming` | 项目设计、需求分析 |
+| 规划师 (planner) | `superpowers:writing-plans` | 产出执行计划 |
+| 执行者 (executor) | `superpowers:test-driven-development` | 编码实现 |
+| 执行者 (executor) | `superpowers:subagent-driven-development` | 并行开发 |
+| 审查者 (reviewer) | `superpowers:systematic-debugging` | 审查发现问题时 |
+| 审查者 (reviewer) | `superpowers:verification-before-completion` | 验证完成 |
+
+- 项目可为每个阶段覆盖 skill 映射（改为自己的 skill 或禁用）
+- 新增 plugin 后可在 skill 映射中引用
+
+### 6.3 Skill 注入方式
+
+编排引擎启动 Claude Code 进程时：
+
+```
+function start_claude_code(node, task_id, worktree_path):
+    context = assemble_context(node, task_id)
+    
+    config = {
+        "cwd": worktree_path,
+        "claude_md_inject": context.tier1,
+        "skill": node.skill,           // 指定 skill 自动激活
+        "skill_args": node.skill_args,
+        "extra_context": context.tier2
+    }
+    
+    return claude_code_run(config)
+```
+
+## 7. DAG 编排模型
+
+### 7.1 节点定义
 
 每个节点指定一个 Agent 角色，包含：
 - **agent**：使用的 Agent 模板
 - **depends_on**：依赖的前置节点（决定并行/串行）
 - **review_gate**：节点完成后是否需要人工审查
+- **skill**：该阶段注入的 skill（如 `superpowers:brainstorming`）
 - **context**：注入的额外上下文（关注路径、特定规则等）
 
-### 5.2 不同类型的工作流示例
+### 7.2 不同类型的工作流示例
 
 **开发任务 (development)：**
 ```
@@ -179,7 +281,7 @@ Project ──1:N──> Workflow
                    [审查门: on]
 ```
 
-### 5.3 编排引擎行为
+### 7.3 编排引擎行为
 
 ```
 function run_task(task_id, trigger_source):
@@ -201,7 +303,7 @@ function run_task(task_id, trigger_source):
         notify_user(task_id, "complete")
 ```
 
-## 6. 上下文传递
+## 8. 上下文传递
 
 每个 Claude Code 进程启动时，编排引擎组装三层上下文，全部来自 SQLite + 文件系统：
 
@@ -211,7 +313,7 @@ function run_task(task_id, trigger_source):
 | Tier 2 节点注入 | 上游节点产物 + 相关失败案例 + 约束规则 | task_node_run + known_issue + constraint_rule 表 |
 | Tier 3 可查询 | 全量历史会话、设计文档 | agent_session 表 + 仓库文件 |
 
-## 7. 学习循环
+## 9. 学习循环
 
 ```
 Agent 失败 → 记录 KnownIssue
@@ -224,7 +326,7 @@ Agent 失败 → 记录 KnownIssue
           团队判断是否通用化 → 提升 level=global
 ```
 
-## 8. 两个入口
+## 10. 两个入口
 
 | | Claude Code 对话 | Web 界面 |
 |---|---|---|
@@ -235,7 +337,7 @@ Agent 失败 → 记录 KnownIssue
 | 进度查看 | 对话内 | Web 实时 trace |
 | 审查确认 | 对话内 | Web 页面 |
 
-## 9. 工作流选择
+## 11. 工作流选择
 
 - 项目可配置多个 workflow
 - 创建 task 时，系统根据 **task_type** + **complexity** 自动推荐 workflow
@@ -243,7 +345,7 @@ Agent 失败 → 记录 KnownIssue
 - 开发者可强制指定不同 workflow
 - 项目可为每种 task_type 定义覆盖的默认 workflow
 
-## 10. MVP 范围
+## 12. MVP 范围
 
 - SQLite 数据库 + 核心表
 - 编排引擎（Python）：DAG 解析 → Claude Code 进程管理 → 上下文组装
@@ -253,8 +355,10 @@ Agent 失败 → 记录 KnownIssue
 - 项目级学习：KnownIssue 记录 + ConstraintRule 更新
 - 审查门（可配置开关）
 - 任务类型：exploration、development、testing，各自默认工作流
+- 工作空间管理：workspace/ 目录 + git worktree 隔离
+- Skills 集成：节点绑定 skill，支持任意 plugin 和自定义 skill
 
-## 11. 后续版本
+## 13. 后续版本
 
 **V2**：通用级学习、多任务并行编排、自定义 Linter、Agent 模板热更新
 **V3**：无人值守调度、熵管理、浏览器自动化测试、DAG 可视化编辑器
