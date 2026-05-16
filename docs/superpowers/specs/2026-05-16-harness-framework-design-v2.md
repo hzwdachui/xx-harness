@@ -76,13 +76,22 @@ Project ──1:N──> Workflow
   ├──1:N──> ConstraintRule (项目级约束)
   ├──1:N──> Task
   │            │
-  │            ├──1:N──> TaskNodeRun (每个 DAG 节点的执行记录)
-  │            └──1:N──> TaskSplit (任务拆分)
+  │            ├── task_type: exploration / development / testing / deployment / custom
+  │            ├──1:N──> TaskNodeRun
+  │            └──1:N──> TaskSplit
   │
   └──1:N──> KnownIssue
 ```
 
-### 4.1 管理数据
+### 4.0 任务类型
+
+| 类型 | 说明 | 默认工作流 |
+|------|------|-----------|
+| `exploration` | 代码分析、技术调研、依赖梳理 | researcher → [summary] |
+| `development` | 功能开发、重构 | researcher → planner → [review?] → executor(s) → tester → [review?] |
+| `testing` | 单测/集成/E2E 测试编写或运行 | researcher → tester → [review?] |
+| `deployment` | 部署、发布 | tester → deployer |
+| `custom` | 用户自定义 | 创建时手动选择或定义工作流 |
 
 | 实体 | 关键字段 | 说明 |
 |------|---------|------|
@@ -96,7 +105,7 @@ Project ──1:N──> Workflow
 
 | 实体 | 关键字段 | 说明 |
 |------|---------|------|
-| Task | project_id, workflow_id, title, description, status, complexity | 一次开发任务 |
+| Task | project_id, task_type, workflow_id, title, description, status, complexity | 一次任务，类型决定默认工作流 |
 | TaskSplit | task_id, parent_split_id, description, focus_path, status | 任务拆分树 |
 | TaskNodeRun | task_id, node_id, split_id, agent_id, status, cc_session_id, result | 每个 DAG 节点的执行记录 |
 
@@ -117,8 +126,9 @@ Project ──1:N──> Workflow
 - **review_gate**：节点完成后是否需要人工审查
 - **context**：注入的额外上下文（关注路径、特定规则等）
 
-### 5.2 工作流示例
+### 5.2 不同类型的工作流示例
 
+**开发任务 (development)：**
 ```
                ┌──────────┐
                │ 研究员    │
@@ -133,7 +143,7 @@ Project ──1:N──> Workflow
         ┌───────────┼───────────┐
         ▼           ▼           ▼
   ┌──────────┐ ┌──────────┐ ┌──────────┐
-  │ 执行者A  │ │ 执行者B  │ │ 执行者C  │  并行
+  │ 执行者A  │ │ 执行者B  │ │ 执行者C  │
   └────┬─────┘ └────┬─────┘ └────┬─────┘
        │            │            │
        └────────────┼────────────┘
@@ -145,8 +155,28 @@ Project ──1:N──> Workflow
                [审查门: on]
                     │
                ┌────▼─────┐
-               │ 部署者    │
+               │ 部署者    │ (可选)
                └──────────┘
+```
+
+**探索任务 (exploration)：**
+```
+  ┌──────────┐
+  │ 研究员    │
+  └────┬─────┘
+       │
+  ┌────▼─────┐
+  │ 分析报告   │ ← 产出到 SQLite / 供对话查看
+  └──────────┘
+```
+
+**单测试任务 (testing)：**
+```
+  ┌──────────┐     ┌──────────┐
+  │ 研究员    │────→│ 测试者    │
+  └──────────┘     └────┬─────┘
+                        │
+                   [审查门: on]
 ```
 
 ### 5.3 编排引擎行为
@@ -207,19 +237,22 @@ Agent 失败 → 记录 KnownIssue
 
 ## 9. 工作流选择
 
-- 项目可配置多个 workflow（如 simple、standard、full）
-- 创建 task 时，系统根据复杂度自动推荐 workflow
-- 开发者可强制指定 workflow
+- 项目可配置多个 workflow
+- 创建 task 时，系统根据 **task_type** + **complexity** 自动推荐 workflow
+- task_type 有默认映射（探索→exploration 流程，开发→development 流程，测试→testing 流程）
+- 开发者可强制指定不同 workflow
+- 项目可为每种 task_type 定义覆盖的默认 workflow
 
 ## 10. MVP 范围
 
 - SQLite 数据库 + 核心表
 - 编排引擎（Python）：DAG 解析 → Claude Code 进程管理 → 上下文组装
 - 两种入口打通：Claude Code 对话 + Web 后端
-- 内置 Agent 模板：研究员、规划师、执行者、审查者
-- 简单 Web 界面：项目配置、工作流编辑、创建 task、查看 trace
+- 内置 Agent 模板：研究员、规划师、执行者、审查者、测试者
+- 简单 Web 界面：项目配置、工作流编辑、创建 task（支持不同 task_type）、查看 trace
 - 项目级学习：KnownIssue 记录 + ConstraintRule 更新
 - 审查门（可配置开关）
+- 任务类型：exploration、development、testing，各自默认工作流
 
 ## 11. 后续版本
 
