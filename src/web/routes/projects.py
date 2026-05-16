@@ -2,12 +2,12 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends
 from fastapi.encoders import jsonable_encoder
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from src.db.adapter import DatabaseAdapter
 from src.db.repositories import ProjectRepo, RepositoryRepo
 from src.models import Project, Repository
 from src.web.deps import get_db
+from src.web.routes._errors import not_found
 
 router = APIRouter()
 
@@ -45,7 +45,7 @@ def create_project(body: ProjectCreate, db: DatabaseAdapter = Depends(get_db)):
 def get_project(project_id: int, db: DatabaseAdapter = Depends(get_db)):
     p = ProjectRepo(db).get(project_id)
     if not p:
-        return JSONResponse({"error": "not found"}, 404)
+        return not_found()
     return jsonable_encoder(p)
 
 
@@ -54,7 +54,7 @@ def update_project(project_id: int, body: ProjectUpdate, db: DatabaseAdapter = D
     repo = ProjectRepo(db)
     p = repo.get(project_id)
     if not p:
-        return JSONResponse({"error": "not found"}, 404)
+        return not_found()
     if body.name is not None:
         p.name = body.name
     if body.description is not None:

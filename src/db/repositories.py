@@ -27,8 +27,7 @@ class ProjectRepo:
             "INSERT INTO project (name, description, boundary) VALUES (?, ?, ?)",
             [p.name, p.description, p.boundary],
         )
-        row = self._db.fetch_one("SELECT last_insert_rowid() AS id")
-        return row["id"]
+        return self._db.last_insert_id()
 
     def get(self, project_id: int) -> Project | None:
         row = self._db.fetch_one("SELECT * FROM project WHERE id = ?", [project_id])
@@ -74,8 +73,7 @@ class RepositoryRepo:
             "INSERT INTO repository (project_id, name, git_url, default_branch) VALUES (?, ?, ?, ?)",
             [r.project_id, r.name, r.git_url, r.default_branch],
         )
-        row = self._db.fetch_one("SELECT last_insert_rowid() AS id")
-        return row["id"]
+        return self._db.last_insert_id()
 
     def list_by_project(self, project_id: int) -> list[Repository]:
         rows = self._db.fetch_all(
@@ -147,8 +145,7 @@ class WorkflowRepo:
             "INSERT INTO workflow (project_id, name, task_type) VALUES (?, ?, ?)",
             [w.project_id, w.name, w.task_type],
         )
-        row = self._db.fetch_one("SELECT last_insert_rowid() AS id")
-        return row["id"]
+        return self._db.last_insert_id()
 
     def list_by_project(self, project_id: int) -> list[Workflow]:
         rows = self._db.fetch_all(
@@ -214,8 +211,7 @@ class WorkflowNodeRepo:
                 node.position,
             ],
         )
-        row = self._db.fetch_one("SELECT last_insert_rowid() AS id")
-        return row["id"]
+        return self._db.last_insert_id()
 
     def list_by_workflow(self, workflow_id: int) -> list[WorkflowNode]:
         rows = self._db.fetch_all(
@@ -248,8 +244,7 @@ class TaskRepo:
             "VALUES (?, ?, ?, ?, ?, ?, ?)",
             [t.project_id, t.task_type, t.workflow_id, t.title, t.description, t.status, t.complexity],
         )
-        row = self._db.fetch_one("SELECT last_insert_rowid() AS id")
-        return row["id"]
+        return self._db.last_insert_id()
 
     def get(self, task_id: int) -> Task | None:
         row = self._db.fetch_one("SELECT * FROM task WHERE id = ?", [task_id])
@@ -324,8 +319,7 @@ class TaskNodeRunRepo:
                 run.finished_at,
             ],
         )
-        row = self._db.fetch_one("SELECT last_insert_rowid() AS id")
-        return row["id"]
+        return self._db.last_insert_id()
 
     def update(self, run: TaskNodeRun) -> None:
         self._db.execute(
@@ -372,8 +366,7 @@ class KnownIssueRepo:
             "VALUES (?, ?, ?, ?, ?)",
             [issue.project_id, issue.error_pattern, issue.root_cause, issue.rule_update, issue.level],
         )
-        row = self._db.fetch_one("SELECT last_insert_rowid() AS id")
-        return row["id"]
+        return self._db.last_insert_id()
 
     def list_by_project(self, project_id: int) -> list[KnownIssue]:
         rows = self._db.fetch_all(
@@ -408,8 +401,7 @@ class ConstraintRuleRepo:
             "INSERT INTO constraint_rule (project_id, rule_type, content, level) VALUES (?, ?, ?, ?)",
             [rule.project_id, rule.rule_type, rule.content, rule.level],
         )
-        row = self._db.fetch_one("SELECT last_insert_rowid() AS id")
-        return row["id"]
+        return self._db.last_insert_id()
 
     def list_by_project(self, project_id: int) -> list[ConstraintRule]:
         rows = self._db.fetch_all(

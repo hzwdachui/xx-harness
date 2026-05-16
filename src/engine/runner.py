@@ -3,7 +3,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Optional
 
-from src.models import WorkflowNode, Task, TaskNodeRun
+from src.models import WorkflowNode, Task, TaskNodeRun, NodeRunStatus
 from src.engine.context import ContextAssembler
 
 
@@ -15,7 +15,7 @@ class ClaudeCodeRunner:
             project_name: str) -> TaskNodeRun:
         run = TaskNodeRun(
             task_id=task.id, node_id=node.id, agent_id=node.agent_id,
-            status="running", started_at=datetime.now().isoformat(),
+            status=NodeRunStatus.RUNNING.value, started_at=datetime.now().isoformat(),
         )
 
         context = self.context_assembler.build_context(task, node, project_name)
@@ -31,17 +31,17 @@ class ClaudeCodeRunner:
                 cmd, cwd=str(worktree_path) if worktree_path else None,
                 capture_output=True, text=True, timeout=1800,
             )
-            run.status = "done" if result.returncode == 0 else "failed"
+            run.status = NodeRunStatus.DONE.value if result.returncode == 0 else NodeRunStatus.FAILED.value
             run.result_json = {
                 "exit_code": result.returncode,
                 "stdout_tail": result.stdout[-2000:] if result.stdout else "",
                 "stderr_tail": result.stderr[-1000:] if result.stderr else "",
             }
         except subprocess.TimeoutExpired:
-            run.status = "failed"
+            run.status = NodeRunStatus.FAILED.value
             run.result_json = {"error": "timeout after 30min"}
         except Exception as e:
-            run.status = "failed"
+            run.status = NodeRunStatus.FAILED.value
             run.result_json = {"error": str(e)}
 
         run.finished_at = datetime.now().isoformat()

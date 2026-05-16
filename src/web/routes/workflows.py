@@ -1,5 +1,6 @@
-import json
 from fastapi import APIRouter, Depends
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from src.db.adapter import DatabaseAdapter
 from src.db.repositories import WorkflowRepo, WorkflowNodeRepo, AgentRepo
@@ -34,8 +35,6 @@ def list_workflows(project_id: int, db: DatabaseAdapter = Depends(get_db)):
 
 @router.post("/")
 def create_workflow(body: WorkflowCreate, db: DatabaseAdapter = Depends(get_db)):
-    from fastapi.encoders import jsonable_encoder
-
     wf_repo = WorkflowRepo(db)
     wf_id = wf_repo.create(Workflow(
         project_id=body.project_id, name=body.name, task_type=body.task_type,
@@ -46,7 +45,6 @@ def create_workflow(body: WorkflowCreate, db: DatabaseAdapter = Depends(get_db))
     for i, nd in enumerate(body.nodes):
         agent = agent_repo.get_by_name(nd.agent_name)
         if not agent:
-            from fastapi.responses import JSONResponse
             return JSONResponse({"error": f"agent {nd.agent_name} not found"}, 400)
         node_repo.create(WorkflowNode(
             workflow_id=wf_id, agent_id=agent.id,

@@ -15,6 +15,10 @@ class DatabaseAdapter(ABC):
     @abstractmethod
     def fetch_one(self, sql: str, params: list[Any] | None = None) -> dict | None: ...
 
+    def last_insert_id(self) -> int:
+        row = self.fetch_one("SELECT last_insert_rowid() AS id")
+        return row["id"] if row else 0
+
     @abstractmethod
     @contextmanager
     def transaction(self): ...

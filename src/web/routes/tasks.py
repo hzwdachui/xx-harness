@@ -1,12 +1,12 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, BackgroundTasks
+from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 from src.db.adapter import DatabaseAdapter
-from src.db.repositories import TaskRepo, TaskNodeRunRepo, WorkflowRepo
+from src.db.repositories import TaskRepo, TaskNodeRunRepo
 from src.models import Task
 from src.web.deps import get_db, get_orchestrator
-from src.engine.orchestrator import Orchestrator
-from fastapi.encoders import jsonable_encoder
+from src.web.routes._errors import not_found
 
 router = APIRouter()
 
@@ -36,9 +36,7 @@ def start_task(task_id: int, background_tasks: BackgroundTasks,
                db: DatabaseAdapter = Depends(get_db)):
     task = TaskRepo(db).get(task_id)
     if not task:
-        from fastapi.responses import JSONResponse
-        return JSONResponse({"error": "not found"}, 404)
-
+        return not_found()
     orch = get_orchestrator()
     background_tasks.add_task(orch.run_task, task_id, trigger_source="web")
     return {"ok": True, "status": "starting"}
@@ -47,8 +45,7 @@ def start_task(task_id: int, background_tasks: BackgroundTasks,
 def get_task(task_id: int, db: DatabaseAdapter = Depends(get_db)):
     task = TaskRepo(db).get(task_id)
     if not task:
-        from fastapi.responses import JSONResponse
-        return JSONResponse({"error": "not found"}, 404)
+        return not_found()
     runs = TaskNodeRunRepo(db).list_by_task(task_id)
     return jsonable_encoder({"task": task, "node_runs": runs})
 

@@ -2,9 +2,6 @@ from src.models import WorkflowNode
 
 
 def parse_dag(nodes: list[WorkflowNode]) -> dict:
-    """Parse workflow nodes into DAG structure.
-    Returns: {node_id: {"node": WorkflowNode, "deps": [...], "dependents": [...]}}
-    """
     dag = {}
     for n in nodes:
         dag[n.id] = {"node": n, "deps": list(n.depends_on), "dependents": []}
@@ -16,7 +13,6 @@ def parse_dag(nodes: list[WorkflowNode]) -> dict:
 
 
 def get_ready_nodes(dag: dict, completed_node_ids: set[int]) -> list[WorkflowNode]:
-    """Get nodes whose dependencies are all satisfied."""
     ready = []
     for nid, info in dag.items():
         if nid in completed_node_ids:
@@ -27,12 +23,10 @@ def get_ready_nodes(dag: dict, completed_node_ids: set[int]) -> list[WorkflowNod
 
 
 def group_parallel(nodes: list[WorkflowNode]) -> list[list[WorkflowNode]]:
-    """Group independent nodes into parallel batches.
-    Nodes with no dependencies between them run in the same batch."""
     if not nodes:
         return []
     node_map = {n.id: n for n in nodes}
-    # Build dependents map (who depends on me)
+    # who depends on each node
     dependents: dict[int, list[int]] = {n.id: [] for n in nodes}
     for n in nodes:
         for dep_id in n.depends_on:
@@ -43,7 +37,7 @@ def group_parallel(nodes: list[WorkflowNode]) -> list[list[WorkflowNode]]:
     while remaining_ids:
         batch_ids: list[int] = []
         for nid in list(remaining_ids):
-            # A node is ready for this batch if none of its dependents are still remaining
+            # node ready if no dependents remain
             if not any(dep in remaining_ids for dep in dependents[nid]):
                 batch_ids.append(nid)
         if batch_ids:
@@ -58,7 +52,6 @@ def group_parallel(nodes: list[WorkflowNode]) -> list[list[WorkflowNode]]:
 
 
 def topological_sort(dag: dict) -> list[int]:
-    """Topological sort of DAG node IDs. Raises ValueError on cycle."""
     in_degree = {nid: len(info["deps"]) for nid, info in dag.items()}
     queue = [nid for nid, deg in in_degree.items() if deg == 0]
     result = []

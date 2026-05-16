@@ -1,7 +1,6 @@
 from src.engine.context import ContextAssembler
 from src.db.repositories import (
-    ProjectRepo, TaskRepo, TaskNodeRunRepo, WorkflowNodeRepo,
-    KnownIssueRepo, ConstraintRuleRepo, SkillMappingRepo,
+    ProjectRepo, KnownIssueRepo, ConstraintRuleRepo,
 )
 from src.models import Project, Task, WorkflowNode, KnownIssue, ConstraintRule
 
@@ -13,7 +12,7 @@ def test_build_tier1(tmp_db):
     cr_repo = ConstraintRuleRepo(tmp_db)
     cr_repo.create(ConstraintRule(rule_type="style", content="use snake_case", project_id=pid))
 
-    asm = ContextAssembler(tmp_db, proj_repo, None, None, None, None, cr_repo, None)
+    asm = ContextAssembler(tmp_db)
     task = Task(project_id=pid, id=1, title="add login")
 
     ctx = asm.build_tier1(task, "test-project")
@@ -29,7 +28,7 @@ def test_build_tier2_with_issues(tmp_db):
     ki_repo = KnownIssueRepo(tmp_db)
     ki_repo.create(KnownIssue(error_pattern="circular import", root_cause="wrong module layout", project_id=pid))
 
-    asm = ContextAssembler(tmp_db, proj_repo, None, None, None, ki_repo, None, None)
+    asm = ContextAssembler(tmp_db)
     task = Task(project_id=pid, id=1, title="test")
     node = WorkflowNode(workflow_id=1, agent_id=1, skill="superpowers:brainstorming", id=1)
 
