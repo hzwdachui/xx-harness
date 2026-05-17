@@ -1,0 +1,7 @@
+- [x] task 应该串行，你要帮他们排队
+- [x] DONE 的数量不对
+- 编辑dag的时候前端要检查是不是有孤儿node，要拦截这种情况
+- [x] task 应该支持 cancel， retry
+- new task 的时候 应该是 later 应该换成 cancel
+- [x] pipeline 不应该只显示id，看不出来东西
+- [x] skill 不应该在编辑 node 的时候吧，应该在编辑 agent 的地方，而且应该用自然语言描述，tools_json 不要了，这个不是人类编辑的，或者说用自然语言编辑

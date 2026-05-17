@@ -2,7 +2,7 @@ from unittest.mock import patch, MagicMock
 from pathlib import Path
 from src.engine.runner import ClaudeCodeRunner
 from src.engine.context import ContextAssembler
-from src.models import Task, WorkflowNode
+from src.models import Task, WorkflowNode, TaskNodeRun, NodeRunStatus
 
 
 @patch("src.engine.runner.subprocess.run")
@@ -19,9 +19,10 @@ def test_runner_success(mock_run, tmp_path):
     wt = tmp_path / "worktree"
     wt.mkdir()
 
-    run = runner.run(task, node, wt, "test-project")
-    assert run.status == "done"
-    assert run.result_json["exit_code"] == 0
+    run_in = TaskNodeRun(task_id=task.id, node_id=node.id, agent_id=node.agent_id)
+    run_out = runner.run(task, node, wt, "test-project", run_in)
+    assert run_out.status == "done"
+    assert run_out.result_json["exit_code"] == 0
 
     context_file = wt / ".harness-context.md"
     assert context_file.exists()
@@ -39,5 +40,6 @@ def test_runner_failure(mock_run, tmp_path):
     wt = tmp_path / "worktree"
     wt.mkdir()
 
-    run = runner.run(task, node, wt, "proj")
-    assert run.status == "failed"
+    run_in = TaskNodeRun(task_id=task.id, node_id=node.id, agent_id=node.agent_id)
+    run_out = runner.run(task, node, wt, "proj", run_in)
+    assert run_out.status == "failed"

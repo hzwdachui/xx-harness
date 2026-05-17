@@ -21,11 +21,18 @@ frontend/     # React SPA
 tests/        # pytest
 ```
 
-## 运行
+## 使用方式
+
+**核心原则**：xx-harness 通过 Claude Code 直接对话使用，通过 harness 的 API 创建 project → workflow → task，由 orchestrator 调度 agent 执行。Web 前端是辅助管理界面，按需启动。
 
 ```bash
-python run.py              # 后端 :8720
-cd frontend && npm run dev # 前端 :5173（代理到后端）
+# 后端（必须）：harness API + orchestrator 引擎
+python run.py              # :8720
+
+# 前端（按需）：管理面板，需要时再启动
+cd frontend && npm run dev # :5173（代理到后端）
+
+# 测试
 pytest tests/ -v           # 29 个测试
 ```
 

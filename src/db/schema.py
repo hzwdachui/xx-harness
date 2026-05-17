@@ -1,6 +1,14 @@
 from src.db.adapter import DatabaseAdapter
 
 
+def migrate(db: DatabaseAdapter) -> None:
+    """Handle schema migrations for existing databases."""
+    cols = db.fetch_all("PRAGMA table_info(agent_template)")
+    col_names = {c["name"] for c in cols}
+    if "tools_json" in col_names and "skills" not in col_names:
+        db.execute("ALTER TABLE agent_template RENAME COLUMN tools_json TO skills")
+
+
 def create_schema(db: DatabaseAdapter) -> None:
     db.execute("""
         CREATE TABLE IF NOT EXISTS project (
@@ -26,7 +34,7 @@ def create_schema(db: DatabaseAdapter) -> None:
             name TEXT NOT NULL UNIQUE,
             role TEXT NOT NULL,
             system_prompt TEXT DEFAULT '',
-            tools_json TEXT DEFAULT '[]'
+            skills TEXT DEFAULT ''
         )
     """)
     db.execute("""

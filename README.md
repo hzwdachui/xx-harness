@@ -37,6 +37,6 @@ Web 管理界面 ──────┘         │
 |------|------|
 | 项目 | 顶层容器，关联多个仓库，定义边界和约束 |
 | 工作流 | DAG 节点编排，可配置审查门和 skill |
-| 任务 | exploration / development / testing，类型决定默认工作流 |
-| Agent | 5 个内置角色（研究员/规划师/执行者/审查者/测试者） |
+| 任务 | exploration / development / testing / deployment / custom |
+| Agent | 可注册任意 agent，内置 5 个角色（研究员/规划师/执行者/审查者/测试者），每个 agent 可配置自然语言 skills |
 | 学习 | KnownIssue + ConstraintRule，项目级/全局级 |

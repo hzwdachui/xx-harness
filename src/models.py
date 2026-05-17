@@ -16,6 +16,7 @@ class TaskType(str, Enum):
 
 class TaskStatus(str, Enum):
     PENDING = "pending"
+    QUEUED = "queued"
     RUNNING = "running"
     PLAN_READY = "plan_ready"
     PLAN_APPROVED = "plan_approved"
@@ -23,6 +24,7 @@ class TaskStatus(str, Enum):
     CODE_REVIEW = "code_review"
     COMPLETED = "completed"
     FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 class NodeRunStatus(str, Enum):
@@ -61,7 +63,7 @@ class AgentTemplate:
     name: str
     role: str
     system_prompt: str = ""
-    tools_json: str = "[]"
+    skills: str = ""
     id: int | None = None
 
 

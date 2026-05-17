@@ -4,7 +4,7 @@ Usage: python -m src.harness_claude <project_name> [task_id]
 """
 import sys
 from src.db.sqlite import SQLiteAdapter
-from src.db.schema import create_schema, seed_data
+from src.db.schema import create_schema, seed_data, migrate
 from src.db.repositories import ProjectRepo, TaskRepo
 from src.engine.context import ContextAssembler
 from src.config import DB_PATH
@@ -13,6 +13,7 @@ from src.config import DB_PATH
 def get_harness_context(project_name: str, task_id: int | None = None) -> str:
     db = SQLiteAdapter(str(DB_PATH))
     create_schema(db)
+    migrate(db)
     seed_data(db)
 
     proj_repo = ProjectRepo(db)

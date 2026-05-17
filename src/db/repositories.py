@@ -106,7 +106,7 @@ class AgentRepo:
                 name=r["name"],
                 role=r["role"],
                 system_prompt=r["system_prompt"],
-                tools_json=r["tools_json"],
+                skills=r["skills"],
             )
             for r in rows
         ]
@@ -120,8 +120,19 @@ class AgentRepo:
             name=row["name"],
             role=row["role"],
             system_prompt=row["system_prompt"],
-            tools_json=row["tools_json"],
+            skills=row["skills"],
         )
+
+    def get_by_ids(self, ids: set[int]) -> dict[int, str]:
+        """Return {id: name} for the given agent ids."""
+        if not ids:
+            return {}
+        placeholders = ",".join("?" * len(ids))
+        rows = self._db.fetch_all(
+            f"SELECT id, name FROM agent_template WHERE id IN ({placeholders})",
+            list(ids),
+        )
+        return {r["id"]: r["name"] for r in rows}
 
     def get_by_name(self, name: str) -> AgentTemplate | None:
         row = self._db.fetch_one("SELECT * FROM agent_template WHERE name = ?", [name])
@@ -132,8 +143,24 @@ class AgentRepo:
             name=row["name"],
             role=row["role"],
             system_prompt=row["system_prompt"],
-            tools_json=row["tools_json"],
+            skills=row["skills"],
         )
+
+    def create(self, a: AgentTemplate) -> int:
+        self._db.execute(
+            "INSERT INTO agent_template (name, role, system_prompt, skills) VALUES (?, ?, ?, ?)",
+            [a.name, a.role, a.system_prompt, a.skills],
+        )
+        return self._db.last_insert_id()
+
+    def update(self, a: AgentTemplate) -> None:
+        self._db.execute(
+            "UPDATE agent_template SET name=?, role=?, system_prompt=?, skills=? WHERE id=?",
+            [a.name, a.role, a.system_prompt, a.skills, a.id],
+        )
+
+    def delete(self, agent_id: int) -> None:
+        self._db.execute("DELETE FROM agent_template WHERE id = ?", [agent_id])
 
 
 class WorkflowRepo:
@@ -186,6 +213,12 @@ class WorkflowRepo:
             task_type=row["task_type"],
         )
 
+    def update(self, w: Workflow) -> None:
+        self._db.execute(
+            "UPDATE workflow SET name=?, task_type=? WHERE id=?",
+            [w.name, w.task_type, w.id],
+        )
+
     def delete(self, workflow_id: int) -> None:
         self._db.execute("DELETE FROM workflow_node WHERE workflow_id = ?", [workflow_id])
         self._db.execute("DELETE FROM workflow WHERE id = ?", [workflow_id])
@@ -233,6 +266,37 @@ class WorkflowNodeRepo:
             for r in rows
         ]
 
+    def delete_by_workflow(self, workflow_id: int) -> None:
+        # Single query: find nodes with no task_node_runs referencing them
+        rows = self._db.fetch_all(
+            """SELECT wn.id, COUNT(tnr.id) as run_count
+               FROM workflow_node wn
+               LEFT JOIN task_node_run tnr ON tnr.node_id = wn.id
+               WHERE wn.workflow_id = ?
+               GROUP BY wn.id""",
+            [workflow_id],
+        )
+        safe_ids = [r["id"] for r in rows if r["run_count"] == 0]
+        if safe_ids:
+            placeholders = ",".join("?" for _ in safe_ids)
+            self._db.execute(
+                f"DELETE FROM workflow_node WHERE id IN ({placeholders})",
+                safe_ids,
+            )
+
+    def update_node(self, node_id: int, agent_id: int, depends_on: list[int],
+                    review_gate: bool, skill: str, position: int) -> None:
+        self._db.execute(
+            "UPDATE workflow_node SET agent_id=?, depends_on=?, review_gate=?, skill=?, position=? WHERE id=?",
+            [agent_id, json.dumps(depends_on), 1 if review_gate else 0, skill, position, node_id],
+        )
+
+    def update_node_deps(self, node_id: int, depends_on: list[int]) -> None:
+        self._db.execute(
+            "UPDATE workflow_node SET depends_on=? WHERE id=?",
+            [json.dumps(depends_on), node_id],
+        )
+
 
 class TaskRepo:
     def __init__(self, db: DatabaseAdapter) -> None:
@@ -266,6 +330,10 @@ class TaskRepo:
 
     def list_pending(self) -> list[Task]:
         rows = self._db.fetch_all("SELECT * FROM task WHERE status = 'pending'")
+        return [self._row_to_task(r) for r in rows]
+
+    def list_by_status(self, status: str) -> list[Task]:
+        rows = self._db.fetch_all("SELECT * FROM task WHERE status = ?", [status])
         return [self._row_to_task(r) for r in rows]
 
     def update_status(self, task_id: int, status: str) -> None:

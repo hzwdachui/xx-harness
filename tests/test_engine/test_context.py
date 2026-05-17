@@ -32,6 +32,6 @@ def test_build_tier2_with_issues(tmp_db):
     task = Task(project_id=pid, id=1, title="test")
     node = WorkflowNode(workflow_id=1, agent_id=1, skill="superpowers:brainstorming", id=1)
 
-    ctx = asm.build_tier2(task, node)
+    ctx = asm.build_tier2(task, node, agent_skills="superpowers:brainstorming, read-only access")
     assert "circular import" in ctx
     assert "superpowers:brainstorming" in ctx

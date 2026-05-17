@@ -34,7 +34,7 @@ class ContextAssembler:
 {constraint_text or "No additional constraints."}
 """
 
-    def build_tier2(self, task: Task, node: WorkflowNode) -> str:
+    def build_tier2(self, task: Task, node: WorkflowNode, agent_skills: str = "") -> str:
         parts = []
 
         prev_runs = self.node_run_repo.list_by_task(task.id)
@@ -54,12 +54,12 @@ class ContextAssembler:
             for issue in all_issues:
                 parts.append(f"- {issue.error_pattern}: {issue.root_cause}")
 
-        if node.skill:
-            parts.append(f"\n## Active Skill\nUse skill: `{node.skill}`")
+        if agent_skills:
+            parts.append(f"\n## Agent Skills\n{agent_skills}")
 
         return "\n".join(parts)
 
-    def build_context(self, task: Task, node: WorkflowNode, project_name: str) -> str:
+    def build_context(self, task: Task, node: WorkflowNode, project_name: str, agent_skills: str = "") -> str:
         t1 = self.build_tier1(task, project_name)
-        t2 = self.build_tier2(task, node)
+        t2 = self.build_tier2(task, node, agent_skills)
         return f"{t1}\n\n---\n\n{t2}"

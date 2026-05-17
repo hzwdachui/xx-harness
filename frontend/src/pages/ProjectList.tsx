@@ -1,57 +1,134 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
+import type { Project } from "../api";
+import { ConfirmModal } from "../components/ConfirmModal";
+import { ErrorBanner } from "../components/ErrorBanner";
 
 export function ProjectList() {
-  const [projects, setProjects] = useState<any[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
-  useEffect(() => { api.projects.list().then(setProjects); }, []);
-
-  async function handleCreate() {
-    await api.projects.create({ name, description });
-    setName(""); setDescription("");
-    setShowForm(false);
-    api.projects.list().then(setProjects);
+  function loadProjects() {
+    setLoading(true);
+    setError(null);
+    api.projects.list()
+      .then(setProjects)
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false));
   }
 
-  async function handleDelete(id: number) {
-    if (!confirm("Delete this project?")) return;
-    await api.projects.delete(id);
-    api.projects.list().then(setProjects);
+  useEffect(() => { loadProjects(); }, []);
+
+  async function handleCreate() {
+    if (!name.trim()) return;
+    try {
+      await api.projects.create({ name: name.trim(), description: description.trim() || undefined });
+      setName(""); setDescription("");
+      setShowForm(false);
+      loadProjects();
+    } catch (e: any) { setError(e.message); }
+  }
+
+  async function handleDelete() {
+    if (confirmDeleteId == null) return;
+    try {
+      await api.projects.delete(confirmDeleteId);
+      setConfirmDeleteId(null);
+      loadProjects();
+    } catch (e: any) { setError(e.message); }
   }
 
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+    <>
+      <div className="page-header">
         <h1>Projects</h1>
-        <button onClick={() => setShowForm(!showForm)}>+ New Project</button>
+        <p>Manage AI agent orchestration projects. Each project owns its workflows, tasks, and learned constraints.</p>
       </div>
-      {showForm && (
-        <div style={{ border: "1px solid #ccc", padding: 16, marginBottom: 16, borderRadius: 4 }}>
-          <input placeholder="Project name" value={name} onChange={e => setName(e.target.value)} />
-          <input placeholder="Description" value={description} onChange={e => setDescription(e.target.value)} style={{ marginLeft: 8 }} />
-          <button onClick={handleCreate} style={{ marginLeft: 8 }}>Create</button>
+
+      <div className="page-content">
+        <div className="toolbar">
+          <div />
+          <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
+            {showForm ? "CANCEL" : "+ NEW PROJECT"}
+          </button>
         </div>
-      )}
-      <table width="100%" style={{ borderCollapse: "collapse" }}>
-        <thead><tr style={{ textAlign: "left", borderBottom: "2px solid #ddd" }}><th>ID</th><th>Name</th><th>Description</th><th>Actions</th></tr></thead>
-        <tbody>
-          {projects.map((p: any) => (
-            <tr key={p.id} style={{ borderBottom: "1px solid #eee" }}>
-              <td>{p.id}</td>
-              <td><Link to={`/projects/${p.id}`}>{p.name}</Link></td>
-              <td>{p.description}</td>
-              <td>
-                <Link to={`/projects/${p.id}/tasks/new`}><button style={{ marginRight: 8 }}>New Task</button></Link>
-                <button onClick={() => handleDelete(p.id)}>Delete</button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+
+        {showForm && (
+          <div className="inline-form">
+            <input
+              className="form-input"
+              placeholder="Project name"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleCreate()}
+              autoFocus
+            />
+            <input
+              className="form-input"
+              placeholder="Description (optional)"
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleCreate()}
+            />
+            <button className="btn btn-primary" onClick={handleCreate}>CREATE</button>
+          </div>
+        )}
+
+        {error && <ErrorBanner message={`Error: ${error}`} />}
+
+        {loading ? (
+          <div className="loading">LOADING</div>
+        ) : projects.length === 0 ? (
+          <div className="empty-state">
+            <h3>No Projects</h3>
+            <p>Create your first project to start orchestrating AI agents.</p>
+          </div>
+        ) : (
+          <div className="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Name</th>
+                  <th>Description</th>
+                  <th style={{ width: 1 }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {projects.map((p) => (
+                  <tr key={p.id}>
+                    <td>#{p.id}</td>
+                    <td><Link to={`/projects/${p.id}`} className="link">{p.name}</Link></td>
+                    <td style={{ color: "var(--text-secondary)" }}>{p.description || "—"}</td>
+                    <td style={{ display: "flex", gap: 8, whiteSpace: "nowrap" }}>
+                      <Link to={`/projects/${p.id}/tasks/new`}>
+                        <button className="btn btn-sm">NEW TASK</button>
+                      </Link>
+                      <button className="btn btn-sm btn-danger" onClick={() => setConfirmDeleteId(p.id)}>DEL</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <ConfirmModal
+        open={confirmDeleteId != null}
+        title="DELETE PROJECT"
+        message={`Permanently delete project #${confirmDeleteId}? This action cannot be undone.`}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmDeleteId(null)}
+        confirmLabel="DELETE"
+        danger
+      />
+    </>
   );
 }

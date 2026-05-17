@@ -1,17 +1,12 @@
-export function DAGView({ runs }: { runs: any[] }) {
-  const nodeStyle = (status: string) => ({
-    padding: "8px 16px", borderRadius: 4, display: "inline-block",
-    background: status === "done" ? "#4caf50" : status === "running" ? "#2196f3" :
-                status === "failed" ? "#f44336" : status === "waiting_review" ? "#ff9800" : "#9e9e9e",
-    color: "#fff", fontSize: 14,
-  });
+import type { TraceRun } from "../api";
 
+export function DAGView({ runs }: { runs: TraceRun[] }) {
   return (
-    <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+    <div className="pipeline">
       {runs.map((r, i) => (
-        <div key={r.node_id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={nodeStyle(r.status)}>{r.node_id}</div>
-          {i < runs.length - 1 && <span>&rarr;</span>}
+        <div key={r.node_id} style={{ display: "flex", alignItems: "center", gap: 0 }}>
+          <div className={`pipeline-node ${r.status}`}>{r.agent_name || `Node ${r.node_id}`}</div>
+          {i < runs.length - 1 && <span className="pipeline-arrow">&rarr;</span>}
         </div>
       ))}
     </div>
